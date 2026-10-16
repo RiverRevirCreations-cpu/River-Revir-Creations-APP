@@ -1,9 +1,9 @@
-RRC INSTALL PAGE RESTORE — NO AUTO-REDIRECT
+River Revir Creations — GitHub Pages installation shell
 
-Purpose: restore the GitHub Pages install/launch page so it does NOT automatically redirect to Google Apps Script. This matches the reported symptom: the direct-launch patch redirected after 700 ms and prevented the launch page from staying open.
+Files in this folder are only the static installation page, manifest, logo icons, and a minimal service worker for Android PWA installability checks.
 
-Upload the files in this ZIP to the ROOT of the existing GitHub repository, replacing index.html and README.txt, and adding/replacing sw.js and manifest.webmanifest plus icons/ if needed. The ZIP contains the whole static page set.
+Upload the extracted files to the ROOT of the existing GitHub repository, replacing index.html and README.txt, and adding sw.js. Keep manifest.webmanifest and the icons folder.
 
-After committing, wait for GitHub Pages to redeploy. On Android Chrome, open https://riverrevircreations-cpu.github.io/River-Revir-Creations-APP/ directly, reload, wait several seconds, then check the ⋮ menu for Install app or Add to Home screen. If no option appears, send a screenshot of the page and Chrome menu.
+This patch does not modify Google Apps Script source, deployments, databases, or sign-in. The service worker intentionally does not cache requests or provide offline access.
 
-Important limitations: this does not modify Code.gs, Index.html in Apps Script, the database, authentication, or deployment. It does not promise offline access. The button intentionally opens the existing Apps Script URL; Google may show its hosted sign-in header. Do not configure a redirect to script.google.com in GitHub Pages settings.
+After committing, wait for GitHub Pages to redeploy. On Android, close the old install prompt, reload the site in Chrome, wait a few seconds, then check Chrome menu for Install app. If it still hangs, cancel and tell us what Chrome displays.
