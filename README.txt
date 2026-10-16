@@ -1,17 +1,9 @@
-River Revir Creations — Local Installation Prototype (Updated Logo)
+River Revir Creations — GitHub Pages installation shell
 
-Included:
-- index.html: launch-page mockup using your supplied actual logo
-- manifest.webmanifest: proposed PWA metadata
-- icons/rrc-icon-192.png and icons/rrc-icon-512.png: square icon assets preserving the full logo
+Files in this folder are only the static installation page, manifest, logo icons, and a minimal service worker for Android PWA installability checks.
 
-Limitations:
-- Opening index.html from a file does not make it installable as a PWA.
-- Browsers generally require HTTPS (or localhost during development), a valid manifest, and additional install criteria.
-- The launch button opens the existing Apps Script deployment:
-  https://script.google.com/macros/s/AKfycbzIOUPNTBminVmAFroB-KkAehrsJM5cWSYO0_EyD5sHx-WbV7D0vVV3pPP-nwb1oOkm/exec
-- Navigation to the Apps Script origin may leave the standalone app window or show browser UI. Authentication/session behavior needs testing.
-- No Apps Script source files were modified and no deployment was performed.
-- No offline functionality is included or promised.
+Upload the extracted files to the ROOT of the existing GitHub repository, replacing index.html and README.txt, and adding sw.js. Keep manifest.webmanifest and the icons folder.
 
-Review the page and icons before deciding whether to use a local development server or hosting service. Do not replace the existing RRC deployment.
+This patch does not modify Google Apps Script source, deployments, databases, or sign-in. The service worker intentionally does not cache requests or provide offline access.
+
+After committing, wait for GitHub Pages to redeploy. On Android, close the old install prompt, reload the site in Chrome, wait a few seconds, then check Chrome menu for Install app. If it still hangs, cancel and tell us what Chrome displays.

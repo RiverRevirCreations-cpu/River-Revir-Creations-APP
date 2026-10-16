@@ -15,4 +15,15 @@ small{display:block;margin-top:18px;line-height:1.5;color:#686868}
 <h1>River Revir Creations</h1><p>Open your RRC Photobooth Management System.</p>
 <a href="https://script.google.com/macros/s/AKfycbzIOUPNTBminVmAFroB-KkAehrsJM5cWSYO0_EyD5sHx-WbV7D0vVV3pPP-nwb1oOkm/exec" rel="noopener">Open RRC Management System</a>
 <small>Local design prototype only. This page does not modify your Apps Script deployment or provide offline access. The button opens your existing RRC web app.</small>
-</main></body></html>
+</main>
+<script>
+// Minimal service-worker registration for Android PWA installability.
+// This does not cache or intercept requests and does not affect the Apps Script backend.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .catch(function (error) { console.warn('RRC service worker registration failed:', error); });
+  });
+}
+</script>
+</body></html>
