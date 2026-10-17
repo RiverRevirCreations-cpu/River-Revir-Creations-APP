@@ -1,25 +1,13 @@
 {
-  "id": "./",
   "name": "River Revir Creations",
-  "short_name": "River Revir",
-  "description": "Launch River Revir Creations Photobooth Management System",
-  "start_url": "./index.html",
-  "scope": "./",
+  "short_name": "RRC",
+  "start_url": "/River-Revir-Creations-APP/",
+  "scope": "/River-Revir-Creations-APP/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
-    {
-      "src": "./icons/rrc-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/rrc-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
+    { "src": "icons/rrc-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/rrc-icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
