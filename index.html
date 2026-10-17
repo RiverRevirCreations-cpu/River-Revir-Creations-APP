@@ -1,29 +1,68 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#ffffff"><title>River Revir Creations</title>
-<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/rrc-icon-192.png">
-<style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#fff;color:#343434;display:grid;place-items:center;padding:24px}
-main{width:min(100%,520px);text-align:center;border:1px solid #e5e5e5;border-radius:24px;background:#fff;padding:32px 24px;box-shadow:0 16px 44px rgba(20,20,20,.07)}
-img{width:min(100%,360px);height:auto;object-fit:contain;margin:0 auto 24px;display:block}h1{font-size:clamp(1.5rem,5vw,2rem);margin:0 0 8px;font-weight:600}
-p{line-height:1.55;color:#686868;margin:0 auto 24px;max-width:40ch}a{display:inline-block;border-radius:12px;padding:14px 20px;background:#343434;color:#fff;text-decoration:none;font-weight:650}
-small{display:block;margin-top:18px;line-height:1.5;color:#686868}
-</style></head><body><main>
-<img src="./icons/rrc-icon-512.png" alt="River Revir Creations logo">
-<h1>River Revir Creations</h1><p>Open your RRC Photobooth Management System.</p>
-<a href="https://script.google.com/macros/s/AKfycbzIOUPNTBminVmAFroB-KkAehrsJM5cWSYO0_EyD5sHx-WbV7D0vVV3pPP-nwb1oOkm/exec" rel="noopener">Open RRC Management System</a>
-<small>Local design prototype only. This page does not modify your Apps Script deployment or provide offline access. The button opens your existing RRC web app.</small>
-</main>
-<script>
-// Minimal service-worker registration for Android PWA installability.
-// This does not cache or intercept requests and does not affect the Apps Script backend.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .catch(function (error) { console.warn('RRC service worker registration failed:', error); });
-  });
-}
-</script>
-</body></html>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/rrc-icon-192.png">
+  <title>River Revir Creations</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh;
+           display: flex; align-items: center; justify-content: center; background: #fff; }
+    .card { width: min(360px, 90vw); text-align: center; }
+    img { width: 160px; }
+    input, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    button { background: #111; color: #fff; border: 0; border-radius: 8px; }
+    #msg { color: #b00020; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <div class="card" id="login">
+    <img src="icons/rrc-icon-512.png" alt="RRC logo">
+    <h2>River Revir Creations</h2>
+    <p>Photobooth Management System</p>
+    <form id="loginForm">
+      <input id="username" placeholder="Username" autocomplete="username" required>
+      <input id="pin" type="password" placeholder="Access PIN" inputmode="numeric" autocomplete="current-password" required>
+      <button type="submit">Sign in</button>
+      <div id="msg"></div>
+    </form>
+  </div>
+
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg');
+      msg.textContent = 'Signing in...';
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'login',
+            username: document.getElementById('username').value.trim(),
+            pin: document.getElementById('pin').value
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          sessionStorage.setItem('rrcLoggedIn', '1');
+          showDashboard();
+        } else {
+          msg.textContent = data.message;
+        }
+      } catch (err) {
+        msg.textContent = 'Could not reach the server. Check your connection.';
+      }
+    });
+
+    function showDashboard() {
+      document.getElementById('login').innerHTML = '<h2>Dashboard</h2><p>Signed in.</p>';
+      // load your bookings here with more fetch() calls to API_URL
+    }
+  </script>
+</body>
+</html>
