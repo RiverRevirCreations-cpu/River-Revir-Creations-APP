@@ -86,7 +86,7 @@
       if (result.data.success) {
         rrcToken = result.data.authToken;
         message.style.color = "#1a7f37";
-        message.textContent = "Welcome, " + result.data.name + " (" + result.data.role + ")";
+        showDashboard(result.data);
       } else {
         message.textContent = result.data.message;
       }
@@ -97,6 +97,29 @@
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js");
+  }
+    async function showDashboard(auth) {
+  const box = document.getElementById("login");
+  box.innerHTML = "<h2>Welcome, " + auth.name + "</h2><p>" + auth.role + "</p><div id='stats'>Loading...</div>";
+
+  const isAdmin = auth.role === "Manager" || auth.role === "Admin";
+  const res = await callApi(
+    isAdmin ? "getDashboardData" : "getStaffDashboardData",
+    isAdmin ? [new Date().getFullYear()] : [],
+    rrcToken
+  );
+
+  const stats = document.getElementById("stats");
+  if (!res.ok) { stats.textContent = res.message; return; }
+
+  const d = res.data;
+  if (isAdmin) {
+    stats.innerHTML = "<p>Total events: " + d.totalEvents + "</p>" +
+      "<p>Income collected: " + d.totalIncome + "</p>" +
+      "<p>Outstanding balance: " + d.outstandingBalance + "</p>";
+  } else {
+    stats.innerHTML = "<p>Total events: " + d.totalEvents + "</p>" +
+      "<p>Upcoming events: " + d.upcoming + "</p>";
   }
 </script>
 </body>
