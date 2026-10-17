@@ -2,72 +2,100 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/rrc-icon-192.png">
   <title>River Revir Creations</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh;
-           display: flex; align-items: center; justify-content: center; background: #fff; }
-    .card { width: min(360px, 90vw); text-align: center; }
-    img { width: 160px; }
-    input, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
-    button { background: #111; color: #fff; border: 0; border-radius: 8px; }
-    #msg { color: #b00020; min-height: 1.2em; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .box {
+      width: 90%;
+      max-width: 360px;
+      text-align: center;
+    }
+    .box img {
+      width: 150px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      background: #111111;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    #message {
+      color: #b00020;
+      min-height: 24px;
+    }
   </style>
 </head>
 <body>
-  <div class="card" id="login">
+  <div class="box">
     <img src="icons/rrc-icon-512.png" alt="RRC logo">
     <h2>River Revir Creations</h2>
     <p>Photobooth Management System</p>
-    <form id="loginForm">
-      <input id="username" placeholder="Username" autocomplete="username" required>
-      <input id="pin" type="password" placeholder="Access PIN" inputmode="numeric" autocomplete="current-password" required>
-      <button type="submit">Sign in</button>
-      <div id="msg"></div>
-    </form>
+
+    <input id="username" type="text" placeholder="Username">
+    <input id="pin" type="password" placeholder="Access PIN">
+    <button id="signInButton">Sign in</button>
+    <div id="message"></div>
   </div>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+    // Paste your Apps Script web app URL between the quotes below
+    const API_URL = https://script.google.com/macros/s/AKfycbzIOUPNTBminVmAFroB-KkAehrsJM5cWSYO0_EyD5sHx-WbV7D0vVV3pPP-nwb1oOkm/exec;
 
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const msg = document.getElementById('msg');
-      msg.textContent = 'Signing in...';
+    document.getElementById("signInButton").addEventListener("click", async function () {
+      const message = document.getElementById("message");
+      message.textContent = "Signing in...";
+
       try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({
-            action: 'login',
-            username: document.getElementById('username').value.trim(),
-            pin: document.getElementById('pin').value
+            action: "login",
+            username: document.getElementById("username").value,
+            pin: document.getElementById("pin").value
           })
         });
-        const data = await res.json();
-        if (data.ok) {
-          sessionStorage.setItem('rrcLoggedIn', '1');
-          showDashboard();
+
+        const result = await response.json();
+
+        if (result.ok) {
+          message.style.color = "#1a7f37";
+          message.textContent = "Welcome! Login works.";
         } else {
-          msg.textContent = data.message;
+          message.style.color = "#b00020";
+          message.textContent = result.message;
         }
-      } catch (err) {
-        msg.textContent = 'Could not reach the server. Check your connection.';
+      } catch (error) {
+        message.textContent = "Could not connect. Check your internet and try again.";
       }
     });
 
-    function showDashboard() {
-      document.getElementById('login').innerHTML = '<h2>Dashboard</h2><p>Signed in.</p>';
-      // load your bookings here with more fetch() calls to API_URL
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js");
     }
-         <script>
-       if ('serviceWorker' in navigator) {
-         navigator.serviceWorker.register('sw.js');
-       }
-     </script>
   </script>
 </body>
 </html>
