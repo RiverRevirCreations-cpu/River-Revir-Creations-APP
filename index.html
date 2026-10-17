@@ -63,6 +63,11 @@
       document.getElementById('login').innerHTML = '<h2>Dashboard</h2><p>Signed in.</p>';
       // load your bookings here with more fetch() calls to API_URL
     }
+         <script>
+       if ('serviceWorker' in navigator) {
+         navigator.serviceWorker.register('sw.js');
+       }
+     </script>
   </script>
 </body>
 </html>
