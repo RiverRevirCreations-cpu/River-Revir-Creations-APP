@@ -156,7 +156,7 @@
         var needsIframeBridge =
           isMobileDevice &&
           physicalWidth >= 240 &&
-          iframeWidth >= physicalWidth * 1.25;
+          iframeWidth >= physicalWidth * 1.25 && window.self !== window.top;
 
         root.classList.remove('rrc-viewport-bridged');
         root.style.removeProperty('--rrc-viewport-scale');
