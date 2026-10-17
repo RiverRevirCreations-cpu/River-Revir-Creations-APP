@@ -61,41 +61,43 @@
   </div>
 
   <script>
-    // Paste your Apps Script web app URL between the quotes below
-   const API_URL = "https://script.google.com/macros/s/AKfycbwqQaCoG2NupU2NKSAGDmKDORUG4m3aiw-6xi9bTXg1__S0oo8QJ8qUwn_4L7ChvBeE/exec";
+  const API_URL =  "https://script.google.com/macros/s/AKfycbz_VuOocluN4U5r3V6QdboTvxvQb_a-lJyaNSEYN6mjpMRVrupBUE2GS_V3N_bErlKt/exec";
+  let rrcToken = "";
 
-    document.getElementById("signInButton").addEventListener("click", async function () {
-      const message = document.getElementById("message");
-      message.textContent = "Signing in...";
-
-      try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            action: "login",
-            username: document.getElementById("username").value,
-            pin: document.getElementById("pin").value
-          })
-        });
-
-        const result = await response.json();
-
-        if (result.ok) {
-          message.style.color = "#1a7f37";
-          message.textContent = "Welcome! Login works.";
-        } else {
-          message.style.color = "#b00020";
-          message.textContent = result.message;
-        }
-      } catch (error) {
-        message.textContent = "Could not connect. Check your internet and try again.";
-      }
+  async function callApi(action, args, token) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: action, args: args || [], token: token || "" })
     });
+    return res.json();
+  }
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js");
+  document.getElementById("signInButton").addEventListener("click", async function () {
+    const message = document.getElementById("message");
+    message.style.color = "#b00020";
+    message.textContent = "Signing in...";
+    try {
+      const result = await callApi("verifyCredentials", [
+        document.getElementById("username").value,
+        document.getElementById("pin").value
+      ]);
+      if (!result.ok) { message.textContent = result.message; return; }
+      if (result.data.success) {
+        rrcToken = result.data.authToken;
+        message.style.color = "#1a7f37";
+        message.textContent = "Welcome, " + result.data.name + " (" + result.data.role + ")";
+      } else {
+        message.textContent = result.data.message;
+      }
+    } catch (error) {
+      message.textContent = "Could not connect. Check your internet and try again.";
     }
-  </script>
+  });
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js");
+  }
+</script>
 </body>
 </html>
