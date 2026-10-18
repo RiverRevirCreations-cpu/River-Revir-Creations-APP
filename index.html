@@ -8089,7 +8089,7 @@ function switchTab(tabId) {
           var safe=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
           var missingCrew=!rrcCalendarCrewNames_(b).length, pendingLayout=!rrcCalendarLayoutValue_(b);
           var flags=(missingCrew?'<span class="rounded-full bg-rose-100 text-rose-700 px-2 py-1 text-[11px] font-bold">Crew missing</span>':'')+(pendingLayout?'<span class="rounded-full bg-amber-100 text-amber-800 px-2 py-1 text-[11px] font-bold">Layout pending</span>':'');
-          return '<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:p-4"><div class="min-w-0"><div class="font-bold text-slate-900">'+safe(b.clientName||'Client booking')+'</div><div class="mt-1 text-sm text-slate-600">'+safe(b.time||'Time not set')+' · '+safe(b.eventType||b.eventName||b.theme||'Event')+'</div><div class="mt-1 text-xs text-slate-500">'+safe(b.venue||'Venue not recorded')+' · Status: '+safe(b.status||b.eventStatus||'Not specified')+'</div>'+(flags?'<div class="flex flex-wrap gap-1.5 mt-2">'+flags+'</div>':'')+'</div><button type="button" data-rrc-calendar-open="'+safe(b.id)+'" class="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i> View booking</button></div>';
+          return '<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:p-4"><div class="min-w-0"><div class="font-bold text-slate-900">'+safe(b.clientName||'Client booking')+'</div><div class="mt-1 text-sm text-slate-600">'+safe(b.time||'Time not set')+' · '+safe(b.eventType||b.eventName||b.theme||'Event')+'</div><div class=\"mt-1 text-sm font-medium text-slate-800\">Package: '+safe(b.package||'Not set')+'</div><div class="mt-1 text-xs text-slate-500">'+safe(b.venue||'Venue not recorded')+' · Status: '+safe(b.status||b.eventStatus||'Not specified')+'</div>'+(flags?'<div class="flex flex-wrap gap-1.5 mt-2">'+flags+'</div>':'')+'</div><button type="button" data-rrc-calendar-open="'+safe(b.id)+'" class="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i> View booking</button></div>';
         }).join('');
         list.querySelectorAll('[data-rrc-calendar-open]').forEach(function(btn){btn.addEventListener('click',function(){var id=btn.getAttribute('data-rrc-calendar-open');var item=allBookings.find(function(b){return String(b.id)===String(id);});if(item)openDetailModal(item.id);});});
       }
@@ -16761,3 +16761,89 @@ html.device-desktop:not(.rrc-viewport-bridged)[data-rrc-layout="tiles"] #appSide
 })();
 </script>
 <!-- END RRC INSTALL RRC APP PANEL — ADDITIVE SAFE PATCH v1 -->
+
+<!-- RRC MOBILE LAYOUT FIX v2: compact login, readable leads cards, calendar dots + count, day list. Mobile/tablet only. -->
+<style id="rrc-mobile-layout-fix-v2">
+/* 1. LOGIN */
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen { padding: 16px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen > div { max-width: 340px !important; padding: 22px 20px 20px !important; border-radius: 20px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen .rrc-login-logo { width: 128px !important; margin: 0 auto 10px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen h1 { font-size: 20px !important; line-height: 1.2 !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen p.text-slate-500 { font-size: 13px !important; margin: 4px 0 18px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen label { font-size: 12px !important; margin-bottom: 4px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen #loginUsername,
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen #loginPin { height: 42px !important; font-size: 16px !important; border-radius: 12px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen #loginUsername { margin-bottom: 12px !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #loginScreen #loginButton { height: 42px !important; padding: 0 14px !important; border-radius: 12px !important; font-size: 13px !important; }
+
+/* 2. FORM LEADS */
+html:is(.device-phone,.device-tablet,.mobile-device) #view-leads td,
+html:is(.device-phone,.device-tablet,.mobile-device) #view-leads th { width: auto !important; max-width: 100% !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #form-leads-table-body tr { grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #form-leads-table-body td { min-width: 0 !important; white-space: normal !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #form-leads-table-body td::before { white-space: nowrap !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #form-leads-table-body td:nth-child(10) { grid-column: 1 / -1 !important; }
+
+/* 3. CALENDAR (phones/tablets): fixed cells, dots + count, event details in the day list */
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar #calendarGrid > div {
+  height: 64px !important; min-height: 64px !important; max-height: 64px !important;
+  overflow: hidden !important; padding: 4px 3px !important;
+}
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar #calendarGrid > div > div.overflow-y-auto { display: none !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar #calendarGrid span.bg-indigo-600 { display: none !important; }
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar .rrc-cal-mobile-count {
+  display: flex !important; flex-direction: column; align-items: flex-start; gap: 2px;
+  margin-top: 2px; min-width: 0;
+}
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar .rrc-cal-dots { display: flex; gap: 3px; }
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar .rrc-cal-dots i {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+}
+html:is(.device-phone,.device-tablet,.mobile-device) #view-calendar .rrc-cal-count {
+  font-size: 9px; font-weight: 700; line-height: 1.1; color: #475569; white-space: nowrap;
+}
+</style>
+
+<script id="rrc-mobile-calendar-counts">
+(function () {
+  function isTouchLayout() {
+    var c = document.documentElement.classList;
+    return c.contains('device-phone') || c.contains('device-tablet') || c.contains('mobile-device');
+  }
+  function colorOf(chip) {
+    var dot = chip.querySelector('span');
+    return (dot && dot.style.background) || chip.style.borderLeftColor || '#818cf8';
+  }
+  function decorate(grid) {
+    if (!isTouchLayout()) return;
+    Array.prototype.forEach.call(grid.children, function (cell) {
+      var wrap = cell.querySelector(':scope > div.overflow-y-auto');
+      if (!wrap || cell.querySelector('.rrc-cal-mobile-count')) return;
+      var chips = wrap.querySelectorAll('.rrc-calendar-event-chip');
+      if (!chips.length) return;
+      var n = chips.length, dots = '';
+      for (var i = 0; i < Math.min(n, 3); i++) {
+        dots += '<i style="background:' + colorOf(chips[i]) + '"></i>';
+      }
+      var badge = document.createElement('div');
+      badge.className = 'rrc-cal-mobile-count';
+      badge.innerHTML = '<span class="rrc-cal-dots">' + dots + '</span>' +
+        '<span class="rrc-cal-count">' + n + (n === 1 ? ' event' : ' events') + '</span>';
+      wrap.insertAdjacentElement('afterend', badge);
+    });
+  }
+  function start() {
+    var grid = document.getElementById('calendarGrid');
+    if (!grid) return;
+    decorate(grid);
+    new MutationObserver(function () { decorate(grid); }).observe(grid, { childList: true });
+    new MutationObserver(function () { decorate(grid); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('resize', function () { decorate(grid); });
+    window.addEventListener('load', function () { decorate(grid); });
+    setTimeout(function () { decorate(grid); }, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
