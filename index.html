@@ -10848,15 +10848,6 @@ function escapeHtml(v){return v.replace(/[&<>\"']/g,function(c){return {'&':'&am
     ) {
       deviceType = 'tablet';
 
-    /*
-     * TOUCH TABLET FALLBACK
-     */
-    } else if (
-      touch &&
-      width > 0 &&
-      width <= 900
-    ) {
-      deviceType = 'tablet';
     }
 
     var profile = {
