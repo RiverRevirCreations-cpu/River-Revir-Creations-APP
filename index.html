@@ -9624,7 +9624,6 @@ function switchTab(tabId) {
             currentUserUsername = usernameInput.value.trim();
             currentUserName = response.name || '';
             currentUserPosition = response.position || '';
-            managerAuthPin = currentUserRole === 'Manager' ? pin : '';
             authToken = response.authToken || '';
             if (typeof window.rrcPersonalizeAccountChanged === 'function') window.rrcPersonalizeAccountChanged();
             updateUserGreeting(response.name || currentUserName, response.position);
@@ -10688,7 +10687,7 @@ function loadManagerProfileUi() {
     var positionInput = document.getElementById('managerProfilePosition');
     if (nameInput) nameInput.value = (profile && profile.name) || 'Manager';
     if (positionInput) positionInput.value = (profile && profile.position) || 'Manager';
-  }).withFailureHandler(function(e) { alert(e && e.message ? e.message : e); }).getManagerProfile(managerAuthPin);
+  }).withFailureHandler(function(e) { alert(e && e.message ? e.message : e); }).getManagerProfile(authToken);
 }
 
 function saveManagerProfileUi() {
@@ -10701,7 +10700,7 @@ function saveManagerProfileUi() {
     currentUserName = result.name || name;
     updateUserGreeting(currentUserName, result.position || position);
     alert(result.message || 'Manager profile updated successfully.');
-  }).withFailureHandler(function(e) { alert(e && e.message ? e.message : e); }).saveManagerProfile(managerAuthPin, name, position);
+  }).withFailureHandler(function(e) { alert(e && e.message ? e.message : e); }).saveManagerProfile(authToken, name, position);
 }
 
 function loadManagedUsersUi() {
@@ -10717,15 +10716,15 @@ function loadManagedUsersUi() {
     if(body) body.innerHTML='<tr><td colspan="5" class="p-4 text-red-500">Unable to load accounts: '+escapeHtml(e&&e.message?e.message:String(e))+'</td></tr>';
     var sel=document.getElementById('authorizationUserSelect');
     if(sel) sel.innerHTML='<option value="">Unable to load accounts</option>';
-  }).listManagedUsers(managerAuthPin);
+  }).listManagedUsers(authToken);
 }
 function renderManagedUsers(){ var body=document.getElementById('managedUsersBody'); if(!body)return; if(!managedUsersCache.length){body.innerHTML='<tr><td colspan="5" class="p-4 text-slate-400">No accounts yet.</td></tr>';return;} body.innerHTML=managedUsersCache.map(function(u){var isManager=u.id==='manager-profile'||u.role==='Manager';var action=isManager?'<button class="text-indigo-600" onclick="editManagedUser(\''+u.id+'\')">Edit Manager</button>':'<button class="text-indigo-600 mr-3" onclick="editManagedUser(\''+u.id+'\')">Edit</button><button class="text-red-600" onclick="deleteManagedUser(\''+u.id+'\')">Remove</button>';return '<tr class="border-t"><td class="p-3">'+escapeHtml(String(u.name||''))+'</td><td class="p-3">'+escapeHtml(String(u.username||''))+'</td><td class="p-3">'+escapeHtml(String(u.role||''))+'</td><td class="p-3">'+escapeHtml(String(u.position||''))+'</td><td class="p-3 text-right">'+action+'</td></tr>';}).join('');}
 function suggestManagedUsername(){var name=document.getElementById('managedUserName');var username=document.getElementById('managedUserUsername');if(!name||!username||username.dataset.edited==='true')return;var base=String(name.value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9._-]+/g,'.').replace(/^[._-]+|[._-]+$/g,'').replace(/[._-]{2,}/g,'.').substring(0,24);username.value=base||'';}
 function openUserEditor(u){u=u||{};var isManager=u.id==='manager-profile'||u.role==='Manager';document.getElementById('userEditorTitle').textContent=isManager?'Edit Manager Account':(u.id?'Edit Account':'Add Account');document.getElementById('managedUserId').value=u.id||'';document.getElementById('managedUserName').value=u.name||'';document.getElementById('managedUserUsername').value=u.username||'';document.getElementById('managedUserUsername').dataset.edited='';document.getElementById('managedUserRole').value=isManager?'Manager':(u.role||'Staff');document.getElementById('managedUserPosition').value=u.position||'';document.getElementById('managedUserPin').value='';var role=document.getElementById('managedUserRole');var hint=document.getElementById('managedUserRoleHint');role.disabled=isManager;if(hint)hint.textContent=isManager?'Manager authority is protected and cannot be changed. Name, username, position, and PIN can be edited safely.':'';document.getElementById('userEditor').classList.remove('hidden');}
 function editManagedUser(id){var u=managedUsersCache.find(function(x){return x.id===id;});if(u)openUserEditor(u);}
 function closeUserEditor(){document.getElementById('userEditor').classList.add('hidden');}
-function saveUserEditor(){var id=document.getElementById('managedUserId').value;var pin=document.getElementById('managedUserPin').value.trim();if(!pin){alert('Enter the account PIN to save.');return;}var u={id:id,name:document.getElementById('managedUserName').value,username:document.getElementById('managedUserUsername').value,role:document.getElementById('managedUserRole').value,position:document.getElementById('managedUserPosition').value,pin:pin};google.script.run.withSuccessHandler(function(r){if(r&&r.manager&&r.pin){managerAuthPin=r.pin;}if(r&&r.manager){currentUserName=r.name||currentUserName;updateUserGreeting(currentUserName,r.position||'Manager');}alert(r.message||'Saved');closeUserEditor();loadManagedUsersUi();}).withFailureHandler(function(e){alert(e.message||e);}).saveManagedUser(managerAuthPin,u);}
-function deleteManagedUser(id){if(id==='manager-profile'){alert('The Manager account cannot be removed. Edit it instead.');return;}if(!confirm('Remove this account?'))return;google.script.run.withSuccessHandler(function(r){alert(r.message||'Removed');loadManagedUsersUi();}).withFailureHandler(function(e){alert(e.message||e);}).removeManagedUser(managerAuthPin,id);}
+function saveUserEditor(){var id=document.getElementById('managedUserId').value;var pin=document.getElementById('managedUserPin').value.trim();if(!pin){alert('Enter the account PIN to save.');return;}var u={id:id,name:document.getElementById('managedUserName').value,username:document.getElementById('managedUserUsername').value,role:document.getElementById('managedUserRole').value,position:document.getElementById('managedUserPosition').value,pin:pin};google.script.run.withSuccessHandler(function(r) if(r&&r.manager){currentUserName=r.name||currentUserName;updateUserGreeting(currentUserName,r.position||'Manager');}alert(r.message||'Saved');closeUserEditor();loadManagedUsersUi();}).withFailureHandler(function(e){alert(e.message||e);}).saveManagedUser(authToken,u);}
+function deleteManagedUser(id){if(id==='manager-profile'){alert('The Manager account cannot be removed. Edit it instead.');return;}if(!confirm('Remove this account?'))return;google.script.run.withSuccessHandler(function(r){alert(r.message||'Removed');loadManagedUsersUi();}).withFailureHandler(function(e){alert(e.message||e);}).removeManagedUser(authToken,id);}
 function loadAuthorizationEditor(){
   if(currentUserRole!=='Manager')return;
   var id=document.getElementById('authorizationUserSelect').value;
@@ -10738,7 +10737,7 @@ function loadAuthorizationEditor(){
     var groups={}; (r.definitions||[]).forEach(function(d){if(!groups[d.group])groups[d.group]=[];groups[d.group].push(d);});
     var html=''; Object.keys(groups).forEach(function(g){html+='<div class="border border-slate-200 rounded-xl p-4"><h4 class="font-bold text-slate-800 mb-3">'+escapeHtml(g)+'</h4><div class="space-y-2">'; groups[g].forEach(function(d){var checked=r.permissions&&r.permissions[d.key]===true;html+='<label class="flex items-center gap-3 text-sm text-slate-700"><input type="checkbox" class="authorization-permission w-4 h-4" data-permission="'+escapeHtml(d.key)+'" '+(checked?'checked':'')+'><span>'+escapeHtml(d.label)+'</span></label>';}); html+='</div></div>';});
     document.getElementById('authorizationGroups').innerHTML=html; editor.classList.remove('hidden'); empty.classList.add('hidden');
-  }).withFailureHandler(function(e){alert(e&&e.message?e.message:e);}).getRrcUserPermissions(managerAuthPin,id);
+  }).withFailureHandler(function(e){alert(e&&e.message?e.message:e);}).getRrcUserPermissions(authToken,id);
 }
 function populateAuthorizationUsers(){
   var sel=document.getElementById('authorizationUserSelect'); if(!sel)return; sel.innerHTML='<option value="">Select an account…</option>';
@@ -10748,7 +10747,7 @@ function saveAuthorizationEditor(){
   if(currentUserRole!=='Manager')return;
   var id=document.getElementById('authorizationUserSelect').value; if(!id){alert('Select an account first.');return;}
   var permissions={}; document.querySelectorAll('.authorization-permission').forEach(function(cb){permissions[cb.getAttribute('data-permission')]=cb.checked;});
-  google.script.run.withSuccessHandler(function(r){alert(r&&r.message?r.message:'Authorization settings saved.');loadCurrentRrcPermissionsUi(function(){});}).withFailureHandler(function(e){alert(e&&e.message?e.message:e);}).saveRrcUserPermissions(managerAuthPin,id,permissions);
+  google.script.run.withSuccessHandler(function(r){alert(r&&r.message?r.message:'Authorization settings saved.');loadCurrentRrcPermissionsUi(function(){});}).withFailureHandler(function(e){alert(e&&e.message?e.message:e);}).saveRrcUserPermissions(authToken,id,permissions);
 }
 function escapeHtml(v){return v.replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c];});}
   </script>
@@ -14583,7 +14582,6 @@ function changeRrcPmPassword(){
   google.script.run.withSuccessHandler(function(result){
     if(b){b.disabled=false;b.textContent='Change password / PIN';}
     if(c)c.value='';if(n)n.value='';if(v)v.value='';
-    if(currentUserRole==='Manager')managerAuthPin=next;
     rrcPmSecurityStatus((result&&result.message)||'Your password / PIN was changed successfully.',false);
     if(typeof window.rrcShowToast==='function')window.rrcShowToast('Password / PIN changed successfully.','success');
   }).withFailureHandler(function(err){
