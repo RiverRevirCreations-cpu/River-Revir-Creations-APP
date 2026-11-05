@@ -5943,7 +5943,12 @@ html:not(.device-desktop) #appSidebar nav > div > p {
         populateInventorySelect('inventoryEditCondition', 'condition', 'Select condition', ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'], item.condition);
         document.getElementById('inventoryEditStatus').value = item.status || '';
         document.getElementById('inventoryEditQuantity').value = item.quantity || '';
-        document.getElementById('inventoryEditRemaining').value = item.remaining || item.quantity || '';
+        document.getElementById('inventoryEditRemaining').value =
+  item.remaining !== undefined &&
+  item.remaining !== null &&
+  String(item.remaining).trim() !== ''
+    ? item.remaining
+    : (item.quantity !== undefined && item.quantity !== null ? item.quantity : '');
         document.getElementById('inventoryEditLowStockAlertAt').value = item.lowStockAlertAt || '';
         populateInventorySelect('inventoryEditUnit', 'unit', 'Not Set', ['sheet', 'print', 'pcs', 'unit', 'set', 'roll', 'mL', 'L', 'g', 'kg'], item.unit);
         document.getElementById('inventoryEditPurchaseUnit').value = item.purchaseUnit || '';
