@@ -4947,21 +4947,21 @@ html:not(.device-desktop) #appSidebar nav > div > p {
           </label>
 
           <label class="block text-sm font-semibold text-slate-700">
-            Quantity
+            Total Quantity (Usage Units)
             <input id="inventoryEditQuantity"
                    type="number"
                    min="0"
-                   step="1"
+                   step="any"
                    class="inventory-editor-input mt-1"
                    autocomplete="off">
           </label>
 
           <label class="block text-sm font-semibold text-slate-700">
-            Remaining
+            Remaining (Usage Units)
             <input id="inventoryEditRemaining"
                    type="number"
                    min="0"
-                   step="1"
+                   step="any"
                    class="inventory-editor-input mt-1"
                    autocomplete="off">
           </label>
@@ -4979,10 +4979,28 @@ html:not(.device-desktop) #appSidebar nav > div > p {
           </label>
 
           <label class="block text-sm font-semibold text-slate-700">
-            Unit
+            Usage Unit
             <select id="inventoryEditUnit" class="inventory-editor-input mt-1">
               <option value="">Not Set</option>
             </select>
+            <span class="block text-[10px] font-normal text-slate-400 mt-1">Smallest practical unit consumed during an event (e.g. sheet, mL, roll).</span>
+          </label>
+
+          <label class="block text-sm font-semibold text-slate-700">
+            Purchase Unit
+            <input id="inventoryEditPurchaseUnit" class="inventory-editor-input mt-1" placeholder="e.g. box, pack, bottle" autocomplete="off">
+          </label>
+
+          <label class="block text-sm font-semibold text-slate-700">
+            Units per Purchase Unit
+            <input id="inventoryEditUnitsPerPurchaseUnit" type="number" min="0.000001" step="any" class="inventory-editor-input mt-1" placeholder="e.g. 108" autocomplete="off">
+            <span class="block text-[10px] font-normal text-slate-400 mt-1">How many usage units are inside one box, pack, or bottle.</span>
+          </label>
+
+          <label class="block text-sm font-semibold text-slate-700">
+            Purchase Unit Cost
+            <input id="inventoryEditPurchaseUnitCost" type="number" min="0" step="0.01" class="inventory-editor-input mt-1" placeholder="Cost of one box / pack / bottle" autocomplete="off">
+            <span class="block text-[10px] font-normal text-slate-400 mt-1">Used to calculate cost per usage unit. Keep Pur. Value unchanged.</span>
           </label>
 
           <label class="block text-sm font-semibold text-slate-700">
@@ -5927,7 +5945,10 @@ html:not(.device-desktop) #appSidebar nav > div > p {
         document.getElementById('inventoryEditQuantity').value = item.quantity || '';
         document.getElementById('inventoryEditRemaining').value = item.remaining || item.quantity || '';
         document.getElementById('inventoryEditLowStockAlertAt').value = item.lowStockAlertAt || '';
-        populateInventorySelect('inventoryEditUnit', 'unit', 'Not Set', ['pcs', 'unit', 'set', 'box', 'pack'], item.unit);
+        populateInventorySelect('inventoryEditUnit', 'unit', 'Not Set', ['sheet', 'print', 'pcs', 'unit', 'set', 'roll', 'mL', 'L', 'g', 'kg'], item.unit);
+        document.getElementById('inventoryEditPurchaseUnit').value = item.purchaseUnit || '';
+        document.getElementById('inventoryEditUnitsPerPurchaseUnit').value = item.unitsPerPurchaseUnit || '';
+        document.getElementById('inventoryEditPurchaseUnitCost').value = item.purchaseUnitCost || '';
         document.getElementById('inventoryEditLocation').value = item.location || '';
         populateInventorySelect('inventoryEditCustodian', 'custodian', 'Select custodian', [], item.custodian);
         document.getElementById('inventoryEditWarranty').value = item.warrantyExpiry || '';
@@ -6005,6 +6026,9 @@ html:not(.device-desktop) #appSidebar nav > div > p {
           remaining: document.getElementById('inventoryEditRemaining').value,
           lowStockAlertAt: document.getElementById('inventoryEditLowStockAlertAt').value,
           unit: document.getElementById('inventoryEditUnit').value,
+          purchaseUnit: document.getElementById('inventoryEditPurchaseUnit').value.trim(),
+          unitsPerPurchaseUnit: document.getElementById('inventoryEditUnitsPerPurchaseUnit').value,
+          purchaseUnitCost: document.getElementById('inventoryEditPurchaseUnitCost').value,
           location: document.getElementById('inventoryEditLocation').value.trim(),
           custodian: document.getElementById('inventoryEditCustodian').value.trim(),
           warrantyExpiry: document.getElementById('inventoryEditWarranty').value.trim(),
@@ -8407,8 +8431,12 @@ function switchTab(tabId) {
         }
         var optionsHtml = inventoryOptions.map(function(opt, idx) {
           var stock = opt.remaining !== '' && opt.remaining != null ? opt.remaining : opt.quantity;
+          var stockNumber = parseFloat(String(stock == null ? '' : stock).replace(/[^0-9.-]/g, ''));
           var stockLabel = stock !== '' && stock != null ? ' • Stock: ' + stock + (opt.unit ? ' ' + opt.unit : '') : '';
-          return '<option value="' + escapeHtml(opt.assetId) + '"' + (idx === selectedIndex ? ' selected' : '') + '>' + escapeHtml(opt.name + ' — ' + inventoryMoney(opt.unitCost) + stockLabel) + '</option>';
+          if (!isNaN(stockNumber) && opt.unitsPerPurchaseUnit > 0 && opt.purchaseUnit) {
+            stockLabel += ' (' + (stockNumber / opt.unitsPerPurchaseUnit).toLocaleString('en-PH', { maximumFractionDigits: 2 }) + ' ' + opt.purchaseUnit + ')';
+          }
+          return '<option value="' + escapeHtml(opt.assetId) + '"' + (idx === selectedIndex ? ' selected' : '') + '>' + escapeHtml(opt.name + ' — ' + inventoryMoney(opt.unitCost) + '/' + (opt.unit || 'unit') + stockLabel) + '</option>';
         }).join('');
         var selectedOpt = inventoryOptions[selectedIndex];
         var qty = Math.max(1, parseFloat(defaultQty) || 1);
@@ -8419,7 +8447,7 @@ function switchTab(tabId) {
         rowDiv.innerHTML = `
           <select class="flex-1 min-w-0 border rounded-lg p-2 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-slate-900" onchange="updateRowCost('${rowId}')">${optionsHtml}</select>
           <input type="number" min="1" step="any" value="${qty}" class="w-16 border rounded-lg p-2 bg-white text-center font-medium focus:ring-2 focus:ring-slate-900" oninput="updateRowCost('${rowId}')">
-          <span class="w-28 text-slate-500 text-right text-[11px]">${inventoryMoney(selectedOpt.unitCost)} each</span>
+          <span class="w-28 text-slate-500 text-right text-[11px]">${inventoryMoney(selectedOpt.unitCost)} / ${escapeHtml(selectedOpt.unit || 'unit')}</span>
           <span class="w-24 text-right font-bold text-slate-900 line-total">${inventoryMoney(lineTotal)}</span>
           <button type="button" onclick="removeUsageRow('${rowId}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>`;
         container.appendChild(rowDiv);
@@ -8440,7 +8468,7 @@ function switchTab(tabId) {
         var selected = getUsageOptionByAssetId(select.value);
         if (!selected) return;
         var qty = Math.max(0, parseFloat(input.value) || 0);
-        unitCostSpan.innerText = inventoryMoney(selected.unitCost) + ' each';
+        unitCostSpan.innerText = inventoryMoney(selected.unitCost) + ' / ' + (selected.unit || 'unit');
         totalSpan.innerText = inventoryMoney(selected.unitCost * qty);
         calculateTotalUsageCost();
       }
