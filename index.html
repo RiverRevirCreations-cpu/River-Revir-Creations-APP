@@ -5629,12 +5629,8 @@ html:not(.device-desktop) #appSidebar nav > div > p {
       var allBookings = [];
       var activeBookingId = null;
 
-      // Sample default inventory options for usage rows
-      var inventoryOptions = [
-        { name: "Attendant Salary (Essential)", unitCost: 700.00, label: "Attendant Salary (Essential) — ₱700.00 (per event)" },
-        { name: "4R Photo Paper Pack", unitCost: 20.35, label: "4R Photo Paper Pack — ₱20.35 (211 piece left)" },
-        { name: "Ink Cartridge Set", unitCost: 150.00, label: "Ink Cartridge Set — ₱150.00" }
-      ];
+      // Populated from the live RRC Database → Inventory → Event Consumables.
+      var inventoryOptions = [];
 
       window.onload = function() {
 
@@ -8339,24 +8335,52 @@ function switchTab(tabId) {
 
       // --- EVENT USAGE MODAL LOGIC ---
       function openUsageModal() {
-        var item = allBookings.find(b => b.id === activeBookingId);
+        var item = allBookings.find(function(b) { return String(b.id) === String(activeBookingId); });
         if (item) {
-          document.getElementById('usageBadgeInfo').innerText = `${item.clientName} • ${item.rawDate || 'Sep 30, 2026'} • ${item.package || 'Signature'}`;
+          document.getElementById('usageBadgeInfo').innerText = `${item.clientName} • ${item.rawDate || ''} • ${item.package || ''}`;
         }
 
-        // Load initial default sample items matching your design
         var container = document.getElementById('usageRowsContainer');
-        container.innerHTML = '';
-        
-        // Row 1
-        addUsageRowPredefined(0, 1);
-        // Row 2
-        addUsageRowPredefined(1, 5);
-
-        calculateTotalUsageCost();
+        container.innerHTML = '<div class="text-sm text-slate-500 text-center py-6">Loading Event Consumables from the RRC Database...</div>';
+        document.getElementById('estimatedEventCost').innerText = '₱0.00';
         closeDetailModal();
         document.getElementById('usageModal').classList.remove('hidden');
         document.getElementById('usageModal').classList.add('flex');
+
+        google.script.run
+          .withSuccessHandler(function(rows) {
+            inventoryOptions = Array.isArray(rows) ? rows : [];
+            if (!inventoryOptions.length) {
+              container.innerHTML = '<div class="text-sm text-amber-700 bg-amber-50 rounded-xl p-4">No inventory records categorized as <b>Event Consumables</b> were found in the RRC Database. Add or categorize the items in Inventory first.</div>';
+              calculateTotalUsageCost();
+              return;
+            }
+
+            container.innerHTML = '<div class="text-sm text-slate-500 text-center py-6">Loading saved usage for this booking...</div>';
+            google.script.run
+              .withSuccessHandler(function(savedRows) {
+                container.innerHTML = '';
+                savedRows = Array.isArray(savedRows) ? savedRows : [];
+                if (savedRows.length) {
+                  savedRows.forEach(function(saved) {
+                    addUsageRowPredefined(0, saved.quantity, saved.assetId);
+                  });
+                } else {
+                  container.innerHTML = '<div class="usage-empty text-sm text-slate-500 text-center py-5 border border-dashed rounded-xl">No items recorded for this booking yet. Select <b>Add Item</b> to begin.</div>';
+                }
+                calculateTotalUsageCost();
+              })
+              .withFailureHandler(function(err) {
+                container.innerHTML = '<div class="text-sm text-red-600 bg-red-50 rounded-xl p-4">Unable to load saved Event Usage: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
+              })
+              .getSavedEventUsageItems(authToken, activeBookingId);
+          })
+          .withFailureHandler(function(err) {
+            inventoryOptions = [];
+            container.innerHTML = '<div class="text-sm text-red-600 bg-red-50 rounded-xl p-4">Unable to load Event Consumables: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
+            calculateTotalUsageCost();
+          })
+          .getEventUsageInventoryItems(authToken);
       }
 
       function closeUsageModal() {
@@ -8365,36 +8389,45 @@ function switchTab(tabId) {
       }
 
       function addUsageRow() {
+        if (!inventoryOptions.length) return;
+        var container = document.getElementById('usageRowsContainer');
+        if (container && container.querySelector('.usage-empty')) container.innerHTML = '';
         addUsageRowPredefined(0, 1);
         calculateTotalUsageCost();
       }
 
-      function addUsageRowPredefined(defaultOptIndex, defaultQty) {
+      function addUsageRowPredefined(defaultOptIndex, defaultQty, defaultAssetId) {
         var container = document.getElementById('usageRowsContainer');
+        if (!container || !inventoryOptions.length) return;
         var rowId = 'usage_row_' + Date.now() + Math.random().toString(36).substr(2, 5);
-        
-        var optionsHtml = '';
-        inventoryOptions.forEach((opt, idx) => {
-          optionsHtml += `<option value="${idx}" ${idx === defaultOptIndex ? 'selected' : ''}>${opt.label}</option>`;
-        });
-
-        var selectedOpt = inventoryOptions[defaultOptIndex];
-        var lineTotal = selectedOpt.unitCost * defaultQty;
-
+        var selectedIndex = Math.max(0, Math.min(Number(defaultOptIndex) || 0, inventoryOptions.length - 1));
+        if (defaultAssetId) {
+          var matchedIndex = inventoryOptions.findIndex(function(opt) { return String(opt.assetId) === String(defaultAssetId); });
+          if (matchedIndex >= 0) selectedIndex = matchedIndex;
+        }
+        var optionsHtml = inventoryOptions.map(function(opt, idx) {
+          var stock = opt.remaining !== '' && opt.remaining != null ? opt.remaining : opt.quantity;
+          var stockLabel = stock !== '' && stock != null ? ' • Stock: ' + stock + (opt.unit ? ' ' + opt.unit : '') : '';
+          return '<option value="' + escapeHtml(opt.assetId) + '"' + (idx === selectedIndex ? ' selected' : '') + '>' + escapeHtml(opt.name + ' — ' + inventoryMoney(opt.unitCost) + stockLabel) + '</option>';
+        }).join('');
+        var selectedOpt = inventoryOptions[selectedIndex];
+        var qty = Math.max(1, parseFloat(defaultQty) || 1);
+        var lineTotal = selectedOpt.unitCost * qty;
         var rowDiv = document.createElement('div');
         rowDiv.id = rowId;
-        rowDiv.className = "flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100";
+        rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100';
         rowDiv.innerHTML = `
-          <select class="flex-1 border rounded-lg p-2 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-slate-900" onchange="updateRowCost('${rowId}')">
-            ${optionsHtml}
-          </select>
-          <input type="number" min="1" value="${defaultQty}" class="w-16 border rounded-lg p-2 bg-white text-center font-medium focus:ring-2 focus:ring-slate-900" oninput="updateRowCost('${rowId}')">
-          <span class="w-28 text-slate-500 text-right text-[11px]">₱${selectedOpt.unitCost.toFixed(2)} each</span>
-          <span class="w-24 text-right font-bold text-slate-900 line-total">₱${lineTotal.toFixed(2)}</span>
-          <button type="button" onclick="removeUsageRow('${rowId}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>
-        `;
+          <select class="flex-1 min-w-0 border rounded-lg p-2 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-slate-900" onchange="updateRowCost('${rowId}')">${optionsHtml}</select>
+          <input type="number" min="1" step="any" value="${qty}" class="w-16 border rounded-lg p-2 bg-white text-center font-medium focus:ring-2 focus:ring-slate-900" oninput="updateRowCost('${rowId}')">
+          <span class="w-28 text-slate-500 text-right text-[11px]">${inventoryMoney(selectedOpt.unitCost)} each</span>
+          <span class="w-24 text-right font-bold text-slate-900 line-total">${inventoryMoney(lineTotal)}</span>
+          <button type="button" onclick="removeUsageRow('${rowId}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>`;
         container.appendChild(rowDiv);
         calculateTotalUsageCost();
+      }
+
+      function getUsageOptionByAssetId(assetId) {
+        return inventoryOptions.find(function(opt) { return String(opt.assetId) === String(assetId); });
       }
 
       function updateRowCost(rowId) {
@@ -8404,15 +8437,11 @@ function switchTab(tabId) {
         var input = row.querySelector('input[type="number"]');
         var unitCostSpan = row.querySelectorAll('span')[0];
         var totalSpan = row.querySelector('.line-total');
-
-        var optIndex = parseInt(select.value);
-        var qty = parseFloat(input.value) || 0;
-        var unitCost = inventoryOptions[optIndex].unitCost;
-
-        unitCostSpan.innerText = `₱${unitCost.toFixed(2)} each`;
-        var lineTotal = unitCost * qty;
-        totalSpan.innerText = `₱${lineTotal.toFixed(2, 'en-US')}`;
-
+        var selected = getUsageOptionByAssetId(select.value);
+        if (!selected) return;
+        var qty = Math.max(0, parseFloat(input.value) || 0);
+        unitCostSpan.innerText = inventoryMoney(selected.unitCost) + ' each';
+        totalSpan.innerText = inventoryMoney(selected.unitCost * qty);
         calculateTotalUsageCost();
       }
 
@@ -8425,65 +8454,56 @@ function switchTab(tabId) {
       function calculateTotalUsageCost() {
         var rows = document.querySelectorAll('#usageRowsContainer > div');
         var grandTotal = 0;
-        rows.forEach(row => {
+        rows.forEach(function(row) {
           var select = row.querySelector('select');
           var input = row.querySelector('input[type="number"]');
-          if (select && input) {
-            var optIndex = parseInt(select.value);
-            var qty = parseFloat(input.value) || 0;
-            grandTotal += inventoryOptions[optIndex].unitCost * qty;
-          }
+          var selected = select ? getUsageOptionByAssetId(select.value) : null;
+          if (selected && input) grandTotal += selected.unitCost * (parseFloat(input.value) || 0);
         });
-        document.getElementById('estimatedEventCost').innerText = '₱' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        var totalEl = document.getElementById('estimatedEventCost');
+        if (totalEl) totalEl.innerText = inventoryMoney(grandTotal);
       }
 
       function saveUsageData() {
-    var rows = document.querySelectorAll('#usageRowsContainer > div');
-    var itemsUsed = [];
-
-    rows.forEach(row => {
-      var select = row.querySelector('select');
-      var input = row.querySelector('input[type="number"]');
-      if (select && input) {
-        var optIndex = parseInt(select.value);
-        var selectedOptionObj = inventoryOptions[optIndex];
-        var qty = parseFloat(input.value) || 0;
-
-        itemsUsed.push({
-          itemName: selectedOptionObj.name,
-          unitCost: selectedOptionObj.unitCost,
-          quantity: qty,
-          lineTotal: selectedOptionObj.unitCost * qty
+        var rows = document.querySelectorAll('#usageRowsContainer > div');
+        var itemsUsed = [];
+        rows.forEach(function(row) {
+          var select = row.querySelector('select');
+          var input = row.querySelector('input[type="number"]');
+          var selected = select ? getUsageOptionByAssetId(select.value) : null;
+          var qty = input ? parseFloat(input.value) || 0 : 0;
+          if (selected && qty > 0) {
+            itemsUsed.push({ assetId: selected.assetId, itemName: selected.name, quantity: qty });
+          }
         });
-      }
-    });
-
-    // Show a quick loading state or feedback
-    var saveBtn = document.querySelector('#usageModal button[onclick="saveUsageData()"]');
-    var originalText = saveBtn.innerText;
-    saveBtn.innerText = "Saving...";
-    saveBtn.disabled = true;
-
-    // Send data to Apps Script backend
-    google.script.run
-      .withSuccessHandler(function(response) {
-        saveBtn.innerText = originalText;
-        saveBtn.disabled = false;
-        if (response && response.success) {
-          alert(response.message + " Total Cost: ₱" + response.totalCost.toLocaleString('en-US', {minimumFractionDigits: 2}));
-          closeUsageModal();
-          loadDashboard(); // Refresh dashboard metrics if needed
-        } else {
-          alert("Error: " + (response ? response.message : "Unknown error"));
+        if (!itemsUsed.length) {
+          alert('Add at least one Event Consumable with a quantity greater than zero.');
+          return;
         }
-      })
-      .withFailureHandler(function(err) {
-        saveBtn.innerText = originalText;
-        saveBtn.disabled = false;
-        alert("Failed to save usage data: " + err.message);
-      })
-      .saveEventUsage(authToken, activeBookingId, itemsUsed);
-  }
+        var saveBtn = document.querySelector('#usageModal button[onclick="saveUsageData()"]');
+        var originalText = saveBtn.innerText;
+        saveBtn.innerText = 'Saving...';
+        saveBtn.disabled = true;
+        google.script.run
+          .withSuccessHandler(function(response) {
+            saveBtn.innerText = originalText;
+            saveBtn.disabled = false;
+            if (response && response.success) {
+              alert(response.message + ' Total Cost: ₱' + Number(response.totalCost || 0).toLocaleString('en-US', {minimumFractionDigits: 2}));
+              closeUsageModal();
+              loadDashboard();
+              if (typeof loadInventory === 'function') loadInventory();
+            } else {
+              alert('Error: ' + (response ? response.message : 'Unknown error'));
+            }
+          })
+          .withFailureHandler(function(err) {
+            saveBtn.innerText = originalText;
+            saveBtn.disabled = false;
+            alert('Failed to save usage data: ' + (err && err.message ? err.message : String(err)));
+          })
+          .saveEventUsage(authToken, activeBookingId, itemsUsed);
+      }
       // --- END EVENT USAGE MODAL LOGIC ---
 
       var assignableStaffCache = [];
