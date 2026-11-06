@@ -5533,6 +5533,8 @@ html:not(.device-desktop) #appSidebar nav > div > p {
           Jessa San Buenaventura • Sep 30, 2026 • Signature
         </div>
 
+        <p class="text-[10px] text-slate-500">Cost details show current Inventory master pricing. Previously saved Event Usage records retain their original unit-cost snapshots when edited; the saved total returned by the server remains authoritative.</p>
+
         <!-- Items Section -->
         <div class="space-y-3">
           <div class="flex justify-between items-center">
@@ -5817,11 +5819,13 @@ html:not(.device-desktop) #appSidebar nav > div > p {
       function inventoryLowStockStatusHtml(item) {
         var remaining = String(item && item.remaining != null ? item.remaining : '').trim() ? inventoryNumber(item.remaining) : inventoryNumber(item && item.quantity);
         var thresholdRaw = item && item.lowStockAlertAt != null ? String(item.lowStockAlertAt).trim() : '';
+        var unitLabel = String(item && item.unit || '').trim();
+        var unitSuffix = unitLabel ? ' ' + escapeHtml(unitLabel) : '';
         if (remaining <= 0) return '<div class="mt-1 text-[10px] font-bold text-red-600">OUT OF STOCK</div>';
         if (!thresholdRaw) return '';
         var threshold = inventoryNumber(thresholdRaw);
-        if (remaining <= threshold) return '<div class="mt-1 text-[10px] font-bold text-amber-600">LOW STOCK • Alert at '+escapeHtml(String(threshold))+'</div>';
-        return '<div class="mt-1 text-[10px] text-slate-400">Alert at '+escapeHtml(String(threshold))+'</div>';
+        if (remaining <= threshold) return '<div class="mt-1 text-[10px] font-bold text-amber-600">LOW STOCK • Alert at '+escapeHtml(String(threshold))+unitSuffix+'</div>';
+        return '<div class="mt-1 text-[10px] text-slate-400">Alert at '+escapeHtml(String(threshold))+unitSuffix+'</div>';
       }
 
       function updateInventoryLowStockAlert() {
@@ -5835,7 +5839,7 @@ html:not(.device-desktop) #appSidebar nav > div > p {
         });
         if(!low.length){el.classList.add('hidden');el.innerHTML='';return;}
         el.classList.remove('hidden');
-        el.innerHTML='<strong>Low-stock Alert:</strong> '+low.length+' inventory item'+(low.length===1?'':'s')+' at or below the configured threshold — '+low.slice(0,5).map(function(x){return escapeHtml((x.name||x.assetId||'Item')+' ('+(String(x.remaining||'').trim()?x.remaining:x.quantity)+')');}).join(', ')+(low.length>5?'…':'');
+        el.innerHTML='<strong>Low-stock Alert:</strong> '+low.length+' inventory item'+(low.length===1?'':'s')+' at or below the configured threshold — '+low.slice(0,5).map(function(x){return escapeHtml((x.name||x.assetId||'Item')+' ('+(String(x.remaining||'').trim()?x.remaining:x.quantity)+(x.unit?' '+x.unit:'')+')');}).join(', ')+(low.length>5?'…':'');
       }
 
       function renderInventoryTable() {
@@ -5854,15 +5858,20 @@ html:not(.device-desktop) #appSidebar nav > div > p {
             var purchasedQty=inventoryNumber(x.quantity);
             var remainingQty=String(x.remaining||'').trim() ? inventoryNumber(x.remaining) : purchasedQty;
             var purchaseValue=inventoryNumber(x.purchased);
-            var costUnit=purchasedQty>0 ? purchaseValue/purchasedQty : purchaseValue;
+            var purchaseUnitCost=inventoryNumber(x.purchaseUnitCost);
+            var unitsPerPurchaseUnit=inventoryNumber(x.unitsPerPurchaseUnit);
+            var hasDualUnitCost=String(x.purchaseUnitCost == null ? '' : x.purchaseUnitCost).trim() !== '' && unitsPerPurchaseUnit > 0;
+            // Dual-unit records use package cost divided by its conversion quantity.
+            // Legacy records use Pur. Value divided by total usage quantity.
+            var costUnit=hasDualUnitCost ? purchaseUnitCost/unitsPerPurchaseUnit : (purchasedQty>0 ? purchaseValue/purchasedQty : purchaseValue);
             var stockValue=remainingQty*costUnit;
             if(!purchasedQty && String(x.category||'') !== 'Event Consumables') stockValue=purchaseValue;
             var statusClass=/repair|maintenance/i.test(status)?'bg-amber-100 text-amber-700':/lost|disposed|retired/i.test(status)?'bg-red-100 text-red-700':/available|active|in use|in stock/i.test(status)?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-600';
             return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+
               '<td class="px-3 py-3"><div class="font-semibold text-slate-800">'+escapeHtml(x.name||'—')+'</div><div class="text-xs text-slate-400">'+escapeHtml(x.assetId||'')+'</div></td>'+
               '<td class="px-3 py-3">'+escapeHtml(x.category||'—')+'</td>'+
-              '<td class="px-3 py-3">'+inventoryQuantityDisplay(x.quantity)+'</td>'+
-              '<td class="px-3 py-3"><div>'+inventoryQuantityDisplay(String(x.remaining||'').trim()?x.remaining:x.quantity)+'</div>'+inventoryLowStockStatusHtml(x)+'</td>'+
+              '<td class="px-3 py-3">'+inventoryQuantityDisplay(x.quantity)+(x.unit?' '+escapeHtml(x.unit):'')+'</td>'+
+              '<td class="px-3 py-3"><div>'+inventoryQuantityDisplay(String(x.remaining||'').trim()?x.remaining:x.quantity)+(x.unit?' '+escapeHtml(x.unit):'')+'</div>'+inventoryLowStockStatusHtml(x)+'</td>'+
               '<td class="px-3 py-3">'+inventoryMoney(costUnit)+'</td>'+
               '<td class="px-3 py-3">'+inventoryMoney(stockValue)+'</td>'+
               '<td class="px-3 py-3"><span class="inline-flex px-2 py-1 rounded-lg text-xs font-semibold '+statusClass+'">'+escapeHtml(status)+'</span></td>'+
@@ -8425,6 +8434,33 @@ function switchTab(tabId) {
         calculateTotalUsageCost();
       }
 
+      function usageItemDetailHtml(opt) {
+        if (!opt) return '';
+        var stock = opt.remaining !== '' && opt.remaining != null ? opt.remaining : opt.quantity;
+        var stockNumber = parseFloat(String(stock == null ? '' : stock).replace(/[^0-9.-]/g, ''));
+        var conversion = parseFloat(String(opt.unitsPerPurchaseUnit == null ? '' : opt.unitsPerPurchaseUnit).replace(/[^0-9.-]/g, ''));
+        var packageCost = parseFloat(String(opt.purchaseUnitCost == null ? '' : opt.purchaseUnitCost).replace(/[^0-9.-]/g, ''));
+        var hasDualCost = !isNaN(packageCost) && packageCost >= 0 && !isNaN(conversion) && conversion > 0;
+        var packageEquivalent = !isNaN(stockNumber) && conversion > 0 ? (stockNumber / conversion).toLocaleString('en-PH', {maximumFractionDigits:2}) : '—';
+        var purchaseLine = hasDualCost
+          ? '<div><span class="text-slate-400">Purchase cost:</span> <strong>' + inventoryMoney(packageCost) + ' / ' + escapeHtml(opt.purchaseUnit || 'purchase unit') + '</strong></div><div><span class="text-slate-400">Pack conversion:</span> <strong>' + conversion.toLocaleString('en-PH', {maximumFractionDigits:4}) + ' ' + escapeHtml(opt.unit || 'units') + ' / ' + escapeHtml(opt.purchaseUnit || 'purchase unit') + '</strong></div>'
+          : '<div><span class="text-slate-400">Cost basis:</span> <strong>Legacy purchase value ÷ total quantity</strong></div>';
+        return '<div class="usage-item-detail rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-600 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1">' +
+          '<div><span class="text-slate-400">Cost / usage unit:</span> <strong class="text-slate-800">' + inventoryMoney(opt.unitCost) + ' / ' + escapeHtml(opt.unit || 'unit') + '</strong></div>' +
+          purchaseLine +
+          '<div><span class="text-slate-400">Available stock:</span> <strong>' + escapeHtml(stock == null || stock === '' ? 'Not set' : String(stock) + ' ' + (opt.unit || 'units')) + '</strong></div>' +
+          '<div><span class="text-slate-400">Purchase-unit equivalent:</span> <strong>' + escapeHtml(packageEquivalent) + (conversion > 0 && opt.purchaseUnit ? ' ' + escapeHtml(opt.purchaseUnit) : '') + '</strong></div>' +
+          '</div>';
+      }
+
+      function updateUsageRowDetails(row) {
+        if (!row) return;
+        var select = row.querySelector('select');
+        var detail = row.querySelector('.usage-item-detail');
+        var selected = select ? getUsageOptionByAssetId(select.value) : null;
+        if (detail) detail.outerHTML = usageItemDetailHtml(selected);
+      }
+
       function addUsageRowPredefined(defaultOptIndex, defaultQty, defaultAssetId) {
         var container = document.getElementById('usageRowsContainer');
         if (!container || !inventoryOptions.length) return;
@@ -8448,13 +8484,16 @@ function switchTab(tabId) {
         var lineTotal = selectedOpt.unitCost * qty;
         var rowDiv = document.createElement('div');
         rowDiv.id = rowId;
-        rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100';
+        rowDiv.className = 'space-y-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100';
         rowDiv.innerHTML = `
-          <select class="flex-1 min-w-0 border rounded-lg p-2 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-slate-900" onchange="updateRowCost('${rowId}')">${optionsHtml}</select>
-          <input type="number" min="1" step="any" value="${qty}" class="w-16 border rounded-lg p-2 bg-white text-center font-medium focus:ring-2 focus:ring-slate-900" oninput="updateRowCost('${rowId}')">
-          <span class="w-28 text-slate-500 text-right text-[11px]">${inventoryMoney(selectedOpt.unitCost)} / ${escapeHtml(selectedOpt.unit || 'unit')}</span>
-          <span class="w-24 text-right font-bold text-slate-900 line-total">${inventoryMoney(lineTotal)}</span>
-          <button type="button" onclick="removeUsageRow('${rowId}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>`;
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+            <select class="flex-1 min-w-[180px] border rounded-lg p-2 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-slate-900" onchange="updateRowCost('${rowId}')">${optionsHtml}</select>
+            <input type="number" min="1" step="any" value="${qty}" class="w-20 border rounded-lg p-2 bg-white text-center font-medium focus:ring-2 focus:ring-slate-900" oninput="updateRowCost('${rowId}')">
+            <span class="w-28 text-slate-500 text-right text-[11px]">${inventoryMoney(selectedOpt.unitCost)} / ${escapeHtml(selectedOpt.unit || 'unit')}</span>
+            <span class="w-24 text-right font-bold text-slate-900 line-total">${inventoryMoney(lineTotal)}</span>
+            <button type="button" onclick="removeUsageRow('${rowId}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          ${usageItemDetailHtml(selectedOpt)}`;
         container.appendChild(rowDiv);
         calculateTotalUsageCost();
       }
@@ -8475,6 +8514,7 @@ function switchTab(tabId) {
         var qty = Math.max(0, parseFloat(input.value) || 0);
         unitCostSpan.innerText = inventoryMoney(selected.unitCost) + ' / ' + (selected.unit || 'unit');
         totalSpan.innerText = inventoryMoney(selected.unitCost * qty);
+        updateUsageRowDetails(row);
         calculateTotalUsageCost();
       }
 
@@ -8716,7 +8756,7 @@ function switchTab(tabId) {
         if(saveButton){saveButton.disabled=true;saveButton.innerText='Saving...';}
         google.script.run.withSuccessHandler(function(response){
           if(saveButton){saveButton.disabled=false;saveButton.innerText=originalText;}
-          if(response&&response.success){alert(response.message||'Booking successfully saved!');closeBookingModal();loadAllBookings();loadDashboard();renderCalendar();if(activeWebsiteInquiryConversionId){var inquiryId=activeWebsiteInquiryConversionId;activeWebsiteInquiryConversionId='';google.script.run.withSuccessHandler(function(){loadWebsiteInquiries();}).withFailureHandler(function(err){alert('Booking was saved, but inquiry status could not be updated: '+(err&&err.message||err));loadWebsiteInquiries();}).updateRrcWebsiteInquiryStatus(authToken,inquiryId,'Converted to Client');}}
+          if(response&&response.success){alert(response.message||'Booking successfully saved!');closeBookingModal();loadAllBookings();loadDashboard();renderCalendar();if(activeWebsiteInquiryConversionId){var inquiryId=activeWebsiteInquiryConversionId;activeWebsiteInquiryConversionId='';google.script.run.withSuccessHandler(function(){loadWebsiteInquiries();}).withFailureHandler(function(err){alert('Booking was saved, but inquiry status could not be updated. The linked booking will be detected so you can finalize conversion without creating a duplicate. '+(err&&err.message||err));loadWebsiteInquiries();}).updateRrcWebsiteInquiryStatus(authToken,inquiryId,'Converted to Client',Number(response.bookingRow));}}
           else alert('Unable to save booking: '+((response&&response.message)||'Unknown error'));
         }).withFailureHandler(function(error){if(saveButton){saveButton.disabled=false;saveButton.innerText=originalText;}alert('Failed to save booking: '+(error&&error.message?error.message:'Please try again.'));}).saveBooking(authToken,formObj);
       }
@@ -9853,12 +9893,26 @@ function switchTab(tabId) {
     if(el('websiteInquiryFollowup'))el('websiteInquiryFollowup').textContent=rrcWebsiteInquiries.filter(function(r){return ['Contacted','Awaiting Response','Quotation Sent','Follow-Up Scheduled','Interested / Pending Confirmation'].indexOf(r.Status)>=0;}).length;
     var body=el('websiteInquiryBody'); if(!body)return;
     if(!rows.length){body.innerHTML='<tr><td colspan="8" class="p-8 text-center text-gray-400">No matching inquiries.</td></tr>';return;}
-    body.innerHTML=rows.map(function(r){var opts=rrcWebsiteInquiryStatuses.map(function(s){return '<option value="'+rrcInquiryEsc(s)+'" '+(s===r.Status?'selected':'')+'>'+rrcInquiryEsc(s)+'</option>';}).join('');return '<tr class="border-t align-top"><td class="p-3 whitespace-nowrap">'+rrcInquiryEsc(rrcInquiryFormatTimestamp(r['Submitted At']))+'</td><td class="p-3"><strong>'+rrcInquiryEsc(r['First Name']+' '+r['Last Name'])+'</strong><br>'+rrcInquiryEsc(r.Email)+'<br>'+rrcInquiryEsc(r.Phone)+'</td><td class="p-3">'+rrcInquiryEsc(r['Event Type'])+'<br>'+rrcInquiryEsc(r['Event Date'])+'</td><td class="p-3">'+rrcInquiryEsc(r['Event Location'])+'</td><td class="p-3 whitespace-pre-wrap max-w-sm">'+rrcInquiryEsc(r.Message)+'</td><td class="p-3">'+rrcInquiryEsc(r.Source)+'</td><td class="p-3"><select class="rounded-lg border px-2 py-2" onchange="saveWebsiteInquiryStatus(\''+rrcInquiryEsc(r['Inquiry ID'])+'\',this.value,this)">'+opts+'</select></td><td class="p-3"><button type="button" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs hover:bg-indigo-700" onclick="startWebsiteInquiryConversion(\''+rrcInquiryEsc(r['Inquiry ID'])+'\')">Create Booking</button></td></tr>';}).join('');
+    body.innerHTML=rows.map(function(r){
+      var opts=rrcWebsiteInquiryStatuses.map(function(s){return '<option value="'+rrcInquiryEsc(s)+'" '+(s===r.Status?'selected':'')+'>'+rrcInquiryEsc(s)+'</option>';}).join('');
+      var linkedRow=Number(r.convertedBookingRow)||0;
+      var actionButton='';
+      if(r.Status==='Converted to Client'){
+        actionButton='<button type="button" disabled class="px-3 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-semibold cursor-not-allowed">Converted ✓'+(linkedRow?' · Booking #'+linkedRow:'')+'</button>';
+      } else if(linkedRow){
+        actionButton='<button type="button" class="px-3 py-2 rounded-lg bg-amber-100 text-amber-800 text-xs font-semibold hover:bg-amber-200" onclick="finalizeWebsiteInquiryConversion(\''+rrcInquiryEsc(r['Inquiry ID'])+'\','+linkedRow+')">Finalize Conversion · #'+linkedRow+'</button>';
+      } else {
+        actionButton='<button type="button" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs hover:bg-indigo-700" onclick="startWebsiteInquiryConversion(\''+rrcInquiryEsc(r['Inquiry ID'])+'\')">Create Booking</button>';
+      }
+      return '<tr class="border-t align-top"><td class="p-3 whitespace-nowrap">'+rrcInquiryEsc(rrcInquiryFormatTimestamp(r['Submitted At']))+'</td><td class="p-3"><strong>'+rrcInquiryEsc(r['First Name']+' '+r['Last Name'])+'</strong><br>'+rrcInquiryEsc(r.Email)+'<br>'+rrcInquiryEsc(r.Phone)+'</td><td class="p-3">'+rrcInquiryEsc(r['Event Type'])+'<br>'+rrcInquiryEsc(r['Event Date'])+'</td><td class="p-3">'+rrcInquiryEsc(r['Event Location'])+'</td><td class="p-3 whitespace-pre-wrap max-w-sm">'+rrcInquiryEsc(r.Message)+'</td><td class="p-3">'+rrcInquiryEsc(r.Source)+'</td><td class="p-3"><select class="rounded-lg border px-2 py-2" onchange="saveWebsiteInquiryStatus(\''+rrcInquiryEsc(r['Inquiry ID'])+'\',this.value,this)">'+opts+'</select></td><td class="p-3">'+actionButton+'</td></tr>';
+    }).join('');
   }
+
   function startWebsiteInquiryConversion(id){
     var r=rrcWebsiteInquiries.find(function(x){return String(x['Inquiry ID'])===String(id);}); if(!r)return;
     if(!hasRrcPermission('bookings.add')){alert('Your account does not have permission to create bookings.');return;}
     if(r.Status==='Converted to Client'){alert('This inquiry is already marked as converted. Check Bookings before creating another booking.');return;}
+    if(Number(r.convertedBookingRow)>1){alert('A booking has already been created from this inquiry (Booking #'+r.convertedBookingRow+'). Use Finalize Conversion to safely complete the status update without creating another booking.');return;}
     activeWebsiteInquiryConversionId=String(id);
     openBookingModal();
     var set=function(field,value){var el=document.getElementById(field);if(el)el.value=value||'';};
@@ -9868,6 +9922,18 @@ function switchTab(tabId) {
     set('modalEventName',(r['Event Type']||'Event')+' - '+[r['First Name'],r['Last Name']].filter(Boolean).join(' '));
     var type=document.getElementById('modalEventType'); if(type){var candidate=String(r['Event Type']||'');if(Array.prototype.some.call(type.options,function(o){return o.value===candidate;}))type.value=candidate;}
     set('modalNotes','Created from Website Inquiry '+id+'\nOriginal message: '+(r.Message||''));
+  }
+
+  function finalizeWebsiteInquiryConversion(id,bookingRow){
+    if(!hasRrcPermission('bookings.add')){alert('Your account does not have permission to finalize this booking conversion.');return;}
+    if(!Number.isInteger(Number(bookingRow))||Number(bookingRow)<2){alert('The linked booking reference is invalid.');return;}
+    google.script.run.withSuccessHandler(function(result){
+      loadWebsiteInquiries();
+      alert('Inquiry conversion completed. Linked Booking #'+(result.bookingRow||bookingRow)+'.');
+    }).withFailureHandler(function(err){
+      alert('The booking exists, but the inquiry status could not be finalized: '+(err&&err.message||err));
+      loadWebsiteInquiries();
+    }).updateRrcWebsiteInquiryStatus(authToken,id,'Converted to Client',Number(bookingRow));
   }
 
   function saveWebsiteInquiryStatus(id,status,control){control.disabled=true;google.script.run.withSuccessHandler(function(){var r=rrcWebsiteInquiries.find(function(x){return x['Inquiry ID']===id;});if(r)r.Status=status;renderWebsiteInquiries();}).withFailureHandler(function(err){alert(err&&err.message||'Unable to update status.');loadWebsiteInquiries();}).updateRrcWebsiteInquiryStatus(authToken,id,status);}
