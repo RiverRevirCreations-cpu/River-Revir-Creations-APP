@@ -1,4 +1,4 @@
-const CACHE = 'rrc-shell-v13';
+const CACHE = 'rrc-shell-v14';
 const SHELL = [
   '/River-Revir-Creations-APP/',
   '/River-Revir-Creations-APP/index.html',
